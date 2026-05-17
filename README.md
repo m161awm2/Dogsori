@@ -2,7 +2,7 @@
 
 의미 없는 문자열이나 이상한 혼잣말을 입력하면 AI가 그 패턴을 해석해서 코드 아이디어로 재구성하는 실험용 웹 앱입니다.
 
-## 어떻게 만들었나
+## 개요
 
 - `Express`로 간단한 Node.js 서버를 만들었습니다.
 - `public/index.html`, `public/style.css`, `public/script.js`로 브라우저 화면을 구성했습니다.
@@ -12,10 +12,11 @@
 - API 키는 `.env`에만 넣고 GitHub에는 올리지 않습니다.
 ### 예시
 
-<img width="70%" height="70%![Uploading 스크린샷 2026-05-17 오후 8.53.54.png…]()
-" alt="스크린샷 2026-05-17 오후 8 53 54" src="https://github.com/user-attachments/assets/054acc59-06ad-4006-9eca-08818af62dfb" />
+<img width="70%" height="70%" alt="1" src="https://github.com/user-attachments/assets/e0aa22b1-4086-47aa-b563-c7e2337f423a" />
 
 
+
+<img width="1512" height="853" alt="스크린샷 2026-05-17 오후 8 53 58" src="https://github.com/user-attachments/assets/bcfa52e0-995e-414e-b784-2cf4a737a3c0" />
 
 
 
