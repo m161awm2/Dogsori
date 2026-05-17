@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dogsori</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="console">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">AI 재구성 콘솔</p>
+            <h1>Dogsori</h1>
+          </div>
+          <span class="status" id="statusBadge">대기</span>
+        </header>
+
+        <form class="input-panel" id="analyzeForm">
+          <label for="fragmentInput">의미 없는 조각</label>
+          <div class="input-row">
+            <input
+              id="fragmentInput"
+              name="fragment"
+              autocomplete="off"
+              autocapitalize="off"
+              spellcheck="false"
+              placeholder="avjsvdzjvkksdjn"
+              maxlength="80"
+            />
+            <button type="submit" id="analyzeButton">분석</button>
+          </div>
+          <p class="hint">아무말이나 써보세요!</p>
+        </form>
+
+        <section class="log-panel" aria-live="polite">
+          <div class="panel-title">
+            <span>분석 로그</span>
+            <span class="pulse" id="pulseDot"></span>
+          </div>
+          <div class="log-stream" id="logStream">
+            <p>[시스템] 재구성 엔진 초기화 완료</p>
+            <p>[검사] 의미 입력 필터 준비 완료</p>
+          </div>
+        </section>
+
+        <section class="blocked-panel hidden" id="blockedPanel">
+          <div class="panel-title">차단된 입력</div>
+          <p id="blockedReason"></p>
+          <small>실제 요청, 코드, 링크, 민감정보처럼 의도가 뚜렷한 입력은 막습니다.</small>
+        </section>
+
+        <section class="result-grid" id="resultGrid">
+          <article class="result-panel">
+            <div class="panel-title">기술적 해석</div>
+            <p id="analysisOutput" class="empty">분석 결과가 여기에 표시됩니다.</p>
+          </article>
+
+          <article class="result-panel">
+            <div class="panel-title">시스템 개념</div>
+            <p id="conceptOutput" class="empty">생성된 시스템 개념이 여기에 표시됩니다.</p>
+          </article>
+        </section>
+
+        <section class="code-panel">
+          <div class="code-toolbar">
+            <div>
+              <span class="panel-title">생성된 소스</span>
+              <span class="language" id="languageOutput">알 수 없음</span>
+            </div>
+            <div class="toolbar-actions">
+              <button type="button" id="copyButton" disabled>복사</button>
+              <button type="button" id="regenButton" disabled>다시 생성</button>
+            </div>
+          </div>
+          <pre><code id="codeOutput">// 생성 코드가 여기에 표시됩니다.</code></pre>
+          <p class="notes" id="notesOutput"></p>
+        </section>
+      </section>
+    </main>
+
+    <script src="/script.js"></script>
+  </body>
+</html>

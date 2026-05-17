@@ -1,0 +1,27 @@
+{
+  "name": "symbolic-reconstruction-engine",
+  "version": "1.0.0",
+  "description": "Experimental Gemini API web app that reconstructs harmless software concepts from meaningless strings.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "gemini",
+    "express",
+    "experimental",
+    "parser",
+    "vanilla-js"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  },
+  "engines": {
+    "node": ">=18.18.0"
+  }
+}
