@@ -10,32 +10,23 @@ const app = express();
 const port = Number(process.env.PORT || 3000);
 const geminiModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 const geminiApiKey = process.env.GEMINI_API_KEY || '';
+const REQUEST_COOLDOWN_MS = 20_000;
+const resultCache = new Map();
+const lastRequestByIp = new Map();
 
-const GEMINI_PROMPT = `입력값을 장난스럽고 이상한 표현으로 허용할 수 있는지 판단하세요.
+const GEMINI_PROMPT = `역할: 입력이 "실제 작업 요청"인지, "의미 없는 장난 문자열/혼잣말"인지 판정한다.
 
-허용 가능한 입력에는 무작위 키보드 입력, 반복 문자, 발음만 흉내 낸 소리, 무작위 한글 자모, 무작위 라틴 문자, 무작위 숫자, 의미 없는 혼합 토큰, 장난스러운 짧은 문장, 과장된 감상문, 명사와 숫자가 섞인 이상한 말, 혼잣말, 감탄문, 취향 표현, 바람 표현이 포함됩니다.
+허용: 무작위 문자, 반복 문자, 발음 흉내, 짧은 장난문, 감탄/취향/욕구 표현처럼 앱에 작업을 시키지 않는 문장.
+차단: 질문, 명령, 생성/번역/요약/설명/코딩/검색 요청, 코드/명령어/URL/이메일/IP, API 키/토큰/비밀번호/개인정보
 
-예를 들어 "똥은정말맛있다", "똥먹고싶다", "호날두1231최고", "우와아아아ㅋㅋㅋ123", "라면이너무먹고싶다" 같은 입력은 이상한 말이나 혼잣말일 뿐 앱에게 시키는 실제 작업 요청이 아니므로 허용하세요.
 
-차단해야 하는 입력은 앱에게 답변, 생성, 실행, 번역, 요약, 설명, 코딩, 검색 등을 시키는 실제 작업 요청, 질문, 명령, 코드처럼 보이는 텍스트, 명령어처럼 보이는 텍스트, URL, 이메일, IP 주소, API 키나 토큰 같은 비밀값, 개인정보, 위험하거나 불법적인 지시처럼 명확한 실행 의도를 가진 텍스트입니다.
-
-판단 규칙: 사용자가 단순히 자기 생각이나 욕구를 말하는 혼잣말이면 문장이 읽히더라도 허용하세요. 앱이 어떤 작업을 수행해야 답할 수 있는 문장일 때만 차단하세요.
-
-차단해야 하는 입력이라면 다음 JSON을 반환하세요:
+차단 JSON:
 {"blocked":true,"reason":"해당 입력문은 올바르지 않습니다.","analysis":"","concept":"","language":"","code":"","notes":""}
 
-허용 가능한 입력이라면 다음 내용을 담은 JSON을 반환하세요:
-- blocked는 false
-- reason은 빈 문자열
-- analysis는 입력값을 어떻게 해석했는지에 대한 짧은 기술적 설명
-- concept는 무해한 교육용 장난감 소프트웨어 개념
-- language는 생성된 소스 코드의 프로그래밍 언어 이름
-- code는 80줄 이하의 완전하고 무해한 소스 코드
-- notes는 짧은 참고 설명
+허용 JSON:
+{"blocked":false,"reason":"","analysis":"짧은 한국어 설명","concept":"무해한 교육용 장난감 소프트웨어 개념","language":"언어명","code":"30줄 이하의 완전한 코드","notes":"짧은 한국어 참고"}
 
-중요: reason, analysis, concept, language, notes 값은 반드시 한국어로 작성하세요. code 값 안의 소스 코드는 해당 프로그래밍 언어 문법에 맞게 작성하되, 코드 주석과 출력 문구도 가능한 한 한국어로 작성하세요.
-
-반드시 유효한 JSON만 반환하세요. 키는 blocked, reason, analysis, concept, language, code, notes만 사용하세요.`;
+반드시 유효한 JSON만 반환한다. 키는 blocked, reason, analysis, concept, language, code, notes만 사용한다. code는 30줄 이하, 전체 응답은 짧게 작성한다.`;
 
 const BLOCKED_RESPONSE = {
   blocked: true,
@@ -98,13 +89,17 @@ function parseModelOutput(text) {
 
 function normalizeAiPayload(payload) {
   if (!payload || typeof payload !== 'object') return null;
+  const code = String(payload.code || '')
+    .split('\n')
+    .slice(0, 30)
+    .join('\n');
   const normalized = {
     blocked: Boolean(payload.blocked),
     reason: String(payload.reason || ''),
     analysis: String(payload.analysis || ''),
     concept: String(payload.concept || ''),
     language: String(payload.language || ''),
-    code: String(payload.code || ''),
+    code,
     notes: String(payload.notes || '')
   };
 
@@ -113,6 +108,40 @@ function normalizeAiPayload(payload) {
   }
 
   return normalized;
+}
+
+function getClientIp(req) {
+  return req.ip || req.socket?.remoteAddress || 'unknown';
+}
+
+function getCachedResult(input) {
+  const cached = resultCache.get(input);
+  return cached ? { ...cached } : null;
+}
+
+function setCachedResult(input, payload) {
+  resultCache.set(input, { ...payload });
+}
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const previous = lastRequestByIp.get(ip) || 0;
+  const waitMs = REQUEST_COOLDOWN_MS - (now - previous);
+
+  if (waitMs > 0) {
+    return { ok: false, retryAfter: Math.ceil(waitMs / 1000) };
+  }
+
+  lastRequestByIp.set(ip, now);
+  return { ok: true, retryAfter: 0 };
+}
+
+class GeminiApiError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.name = 'GeminiApiError';
+    this.status = status;
+  }
 }
 
 function getGeminiText(payload) {
@@ -145,17 +174,17 @@ async function requestGemini(input) {
       ],
       generationConfig: {
         temperature: 0.4,
-        maxOutputTokens: 4096,
+        maxOutputTokens: 500,
         responseMimeType: 'application/json'
       }
     })
   });
 
-  const payload = await response.json();
+  const payload = await response.json().catch(() => ({}));
 
   if (!response.ok) {
     const message = payload?.error?.message || 'Gemini API 요청에 실패했습니다.';
-    throw new Error(message);
+    throw new GeminiApiError(response.status, message);
   }
 
   return payload;
@@ -166,6 +195,19 @@ app.post('/api/analyze', async (req, res) => {
 
   if (!validation.ok) {
     return res.status(200).json(makeBlocked(validation.reason));
+  }
+
+  const cached = getCachedResult(validation.input);
+  if (cached) {
+    return res.json({ ...cached, notes: cached.notes || '이전 분석 결과를 캐시에서 반환했습니다.' });
+  }
+
+  const rateLimit = checkRateLimit(getClientIp(req));
+  if (!rateLimit.ok) {
+    return res.status(429).json({
+      ...makeBlocked('요청이 너무 빠릅니다. 잠시 후 다시 시도하세요.'),
+      notes: `${rateLimit.retryAfter}초 후 다시 요청할 수 있습니다.`
+    });
   }
 
   if (!geminiApiKey) {
@@ -187,11 +229,19 @@ app.post('/api/analyze', async (req, res) => {
       });
     }
 
+    setCachedResult(validation.input, normalized);
     return res.json(normalized);
   } catch (error) {
+    if (error instanceof GeminiApiError && error.status === 429) {
+      return res.status(429).json({
+        ...makeBlocked('Gemini 무료 사용량 제한에 도달했습니다. 잠시 후 다시 시도하세요.'),
+        notes: '요청이 짧은 시간에 많았거나 무료 티어 한도에 가까워졌습니다.'
+      });
+    }
+
     return res.status(502).json({
       ...makeBlocked('Gemini API 처리 중 오류가 발생했습니다.'),
-      notes: error.message || 'Gemini API 상태를 확인하세요.'
+      notes: '잠시 후 다시 시도하세요. 문제가 계속되면 서버 설정을 확인하세요.'
     });
   }
 });

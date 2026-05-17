@@ -18,6 +18,12 @@ const consolePanel = document.querySelector('.console');
 
 let lastFragment = '';
 let logTimer = null;
+let isLoading = false;
+let cooldownTimer = null;
+let cooldownRemaining = 0;
+const COOLDOWN_SECONDS = 20;
+const analyzeButtonLabel = analyzeButton.textContent;
+const regenButtonLabel = regenButton.textContent;
 
 const logLines = [
   '[스캔] 문자 빈도 측정 중',
@@ -25,7 +31,6 @@ const logLines = [
   '[엔트로피] 무질서 경사 추정 중',
   '[검사] 의미 위험 표시 확인 중',
   '[모델] 재구성 가설 요청 중',
-  '[안전] 무해한 코드로 출력 제한 중',
   '[렌더] 생성 결과 정리 중'
 ];
 
@@ -60,11 +65,42 @@ function stopLogAnimation() {
   pulseDot.classList.remove('active');
 }
 
-function setLoading(isLoading) {
-  analyzeButton.disabled = isLoading;
-  regenButton.disabled = isLoading || !lastFragment;
+function updateControls() {
+  const isCoolingDown = cooldownRemaining > 0;
+  analyzeButton.disabled = isLoading || isCoolingDown;
+  regenButton.disabled = isLoading || isCoolingDown || !lastFragment;
   input.disabled = isLoading;
+  analyzeButton.textContent = isCoolingDown ? `${cooldownRemaining}초` : analyzeButtonLabel;
+  regenButton.textContent = isCoolingDown ? `대기 ${cooldownRemaining}초` : regenButtonLabel;
+
+  if (!isLoading && isCoolingDown) {
+    setStatus(`대기 ${cooldownRemaining}초`, 'active');
+  }
+}
+
+function startCooldown() {
+  window.clearInterval(cooldownTimer);
+  cooldownRemaining = COOLDOWN_SECONDS;
+  updateControls();
+
+  cooldownTimer = window.setInterval(() => {
+    cooldownRemaining -= 1;
+
+    if (cooldownRemaining <= 0) {
+      window.clearInterval(cooldownTimer);
+      cooldownTimer = null;
+      cooldownRemaining = 0;
+      setStatus('대기');
+    }
+
+    updateControls();
+  }, 1000);
+}
+
+function setLoading(nextLoading) {
+  isLoading = nextLoading;
   consolePanel.classList.toggle('loading', isLoading);
+  updateControls();
 
   if (isLoading) {
     setStatus('분석 중', 'active');
@@ -106,6 +142,11 @@ function showResult(payload) {
 }
 
 async function analyze(fragment) {
+  if (isLoading || cooldownRemaining > 0) {
+    appendLog('[대기] 쿨타임이 끝난 뒤 다시 시도하세요');
+    return;
+  }
+
   const trimmed = fragment.trim();
 
   if (!trimmed) {
@@ -147,6 +188,7 @@ async function analyze(fragment) {
     notesOutput.textContent = error.message || '서버 상태를 확인하세요.';
   } finally {
     setLoading(false);
+    startCooldown();
   }
 }
 
