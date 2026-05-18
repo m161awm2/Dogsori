@@ -14,18 +14,29 @@ const REQUEST_COOLDOWN_MS = 20_000;
 const resultCache = new Map();
 const lastRequestByIp = new Map();
 
-const GEMINI_PROMPT = `역할: 입력이 "실제 작업 요청"인지, "의미 없는 장난 문자열/혼잣말"인지 판정한다.
+const GEMINI_PROMPT = `역할: 입력이 "실제 작업 요청/민감정보"인지 먼저 걸러낸 뒤, 나머지 이상한 문자열은 반드시 소프트웨어 아이디어와 코드로 재구성한다.
 
 허용: 무작위 문자, 반복 문자, 발음 흉내, 짧은 장난문, 감탄/취향/욕구 표현처럼 앱에 작업을 시키지 않는 문장.
 차단: 질문, 명령, 생성/번역/요약/설명/코딩/검색 요청, 코드/명령어/URL/이메일/IP, API 키/토큰/비밀번호/개인정보
 
+허용된 입력을 처리하는 방식:
+- 단순히 "반복된다", "무작위다", "의미 없다"라고 끝내지 않는다.
+- 입력의 반복, 리듬, 글자 종류, 길이, 자모 느낌, 소리 느낌, 시각적 모양 중 하나를 억지로라도 소프트웨어 규칙으로 해석한다.
+- 그 규칙에서 작은 장난감 프로그램, 미니 시뮬레이터, 패턴 생성기, 텍스트 이펙트, 점수 계산기, 상태 머신, ASCII 애니메이션 중 하나를 만든다.
+- 예: "adadad"는 반복 설명으로 끝내지 말고, a/d 좌우 이동 패턴을 이용한 캐릭터 이동 시뮬레이터나 리듬 패턴 생성기로 만든다.
+- 예: "ㅋㅋㅋㅋ"는 웃음 세기를 수치화하는 콘솔 효과음 생성기처럼 만든다.
+- 예: "qwer"는 키보드 행 위치를 이용한 간단한 패턴 드럼 머신처럼 만든다.
+- 입력이 아주 짧거나 단순해도 반드시 창의적으로 비약해서 결과를 만든다.
 
 차단 JSON:
 {"blocked":true,"reason":"해당 입력문은 올바르지 않습니다.","analysis":"","concept":"","language":"","code":"","notes":""}
 
 허용 JSON:
-{"blocked":false,"reason":"","analysis":"짧은 한국어 설명","concept":"무해한 교육용 장난감 소프트웨어 개념","language":"언어명","code":"30줄 이하의 완전한 코드","notes":"짧은 한국어 참고"}
+{"blocked":false,"reason":"","analysis":"짧은 한국어 설명","concept":"무해한 교육용 장난감 소프트웨어 개념","language":"프로그래밍 언어명","code":"30줄 이하의 실행 가능한 완전한 예제 코드","notes":"짧은 한국어 참고"}
 
+허용할 때 code는 반드시 비어 있지 않아야 한다. code는 입력 문자열을 코드 안에서 실제 데이터로 사용해야 한다.
+analysis에는 입력을 어떻게 소프트웨어 규칙으로 억지 해석했는지 쓴다.
+concept에는 완성된 프로그램의 이름이나 기능을 구체적으로 쓴다.
 반드시 유효한 JSON만 반환한다. 키는 blocked, reason, analysis, concept, language, code, notes만 사용한다. code는 30줄 이하, 전체 응답은 짧게 작성한다.`;
 
 const BLOCKED_RESPONSE = {
@@ -173,9 +184,25 @@ async function requestGemini(input) {
         }
       ],
       generationConfig: {
-        temperature: 0.4,
-        maxOutputTokens: 500,
-        responseMimeType: 'application/json'
+        temperature: 0.2,
+        maxOutputTokens: 1200,
+        thinkingConfig: {
+          thinkingBudget: 0
+        },
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: 'OBJECT',
+          required: ['blocked', 'reason', 'analysis', 'concept', 'language', 'code', 'notes'],
+          properties: {
+            blocked: { type: 'BOOLEAN' },
+            reason: { type: 'STRING' },
+            analysis: { type: 'STRING' },
+            concept: { type: 'STRING' },
+            language: { type: 'STRING' },
+            code: { type: 'STRING' },
+            notes: { type: 'STRING' }
+          }
+        }
       }
     })
   });
