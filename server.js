@@ -14,7 +14,7 @@ const REQUEST_COOLDOWN_MS = 20_000;
 const resultCache = new Map();
 const lastRequestByIp = new Map();
 
-const GEMINI_PROMPT = `역할: 입력이 "실제 작업 요청/민감정보"인지 먼저 걸러낸 뒤, 나머지 이상한 문자열은 반드시 소프트웨어 아이디어와 코드로 재구성한다.
+const GEMINI_PROMPT = `역할: 이상한 문자열은 반드시 소프트웨어 아이디어와 코드로 재구성한다.
 
 허용: 질문이 아닌 문장
 차단: 질문, 명령, 생성/번역/요약/설명/코딩/검색 요청
