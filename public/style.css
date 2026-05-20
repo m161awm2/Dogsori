@@ -51,7 +51,8 @@ input {
 .log-panel,
 .blocked-panel,
 .result-panel,
-.code-panel {
+.code-panel,
+.history-panel {
   border-bottom: 1px solid var(--line);
   padding: 20px;
 }
@@ -215,7 +216,6 @@ small {
 }
 
 .code-panel {
-  border-bottom: 0;
   padding: 0;
 }
 
@@ -257,6 +257,67 @@ code {
   margin: 0;
   padding: 16px 20px 20px;
   border-top: 1px solid var(--line);
+}
+
+.history-panel {
+  border-bottom: 0;
+  background: rgba(13, 25, 24, 0.78);
+}
+
+.history-list {
+  display: grid;
+  gap: 10px;
+}
+
+.history-item {
+  width: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  border-color: var(--line);
+  background: #081615;
+  padding: 12px;
+  text-align: left;
+}
+
+.history-item:hover:not(:disabled) {
+  border-color: var(--line-hot);
+}
+
+.history-main {
+  min-width: 0;
+}
+
+.history-fragment,
+.history-code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-fragment {
+  margin: 0 0 6px;
+  color: var(--text);
+}
+
+.history-code,
+.history-meta,
+.history-empty {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.history-code {
+  margin: 0;
+}
+
+.history-meta {
+  white-space: nowrap;
+}
+
+.history-empty {
+  margin: 0;
 }
 
 .hidden {
@@ -326,5 +387,13 @@ code {
   .toolbar-actions,
   .toolbar-actions button {
     width: 100%;
+  }
+
+  .history-item {
+    grid-template-columns: 1fr;
+  }
+
+  .history-meta {
+    white-space: normal;
   }
 }

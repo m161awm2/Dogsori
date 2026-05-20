@@ -15,6 +15,9 @@ const languageOutput = document.querySelector('#languageOutput');
 const codeOutput = document.querySelector('#codeOutput');
 const notesOutput = document.querySelector('#notesOutput');
 const consolePanel = document.querySelector('.console');
+const historyPanel = document.querySelector('#historyPanel');
+const historyList = document.querySelector('#historyList');
+const historyEmpty = document.querySelector('#historyEmpty');
 
 let lastFragment = '';
 let logTimer = null;
@@ -22,6 +25,8 @@ let isLoading = false;
 let cooldownTimer = null;
 let cooldownRemaining = 0;
 const COOLDOWN_SECONDS = 20;
+const HISTORY_STORAGE_KEY = 'dogsori-success-history';
+const HISTORY_LIMIT = 6;
 const analyzeButtonLabel = analyzeButton.textContent;
 const regenButtonLabel = regenButton.textContent;
 
@@ -47,6 +52,86 @@ function appendLog(line) {
   while (logStream.children.length > 7) {
     logStream.firstElementChild.remove();
   }
+}
+
+function readHistory() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeHistory(history) {
+  localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history.slice(0, HISTORY_LIMIT)));
+}
+
+function formatHistoryTime(timestamp) {
+  return new Intl.DateTimeFormat('ko-KR', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date(timestamp));
+}
+
+function renderHistory() {
+  const history = readHistory();
+  historyList.textContent = '';
+  historyPanel.classList.toggle('hidden', history.length === 0);
+  historyEmpty.classList.toggle('hidden', history.length > 0);
+
+  history.forEach((record) => {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'history-item';
+
+    const main = document.createElement('div');
+    main.className = 'history-main';
+
+    const fragment = document.createElement('p');
+    fragment.className = 'history-fragment';
+    fragment.textContent = record.input;
+
+    const code = document.createElement('p');
+    code.className = 'history-code';
+    code.textContent = `${record.language || '알 수 없음'} · ${record.concept || '생성된 코드'}`;
+
+    const meta = document.createElement('span');
+    meta.className = 'history-meta';
+    meta.textContent = formatHistoryTime(record.createdAt);
+
+    main.append(fragment, code);
+    item.append(main, meta);
+    item.addEventListener('click', () => {
+      lastFragment = record.input;
+      input.value = record.input;
+      showResult(record.payload, { saveHistory: false });
+      appendLog('[기록] 성공 기록을 다시 불러옴');
+    });
+
+    historyList.append(item);
+  });
+}
+
+function rememberSuccessfulResult(inputText, payload) {
+  if (payload.blocked || !payload.code) return;
+
+  const history = readHistory();
+  const record = {
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    input: inputText,
+    language: payload.language,
+    concept: payload.concept,
+    createdAt: Date.now(),
+    payload: { ...payload }
+  };
+  const deduped = history.filter(
+    (item) => item.input !== inputText || item.payload?.code !== payload.code
+  );
+  writeHistory([record, ...deduped]);
+  renderHistory();
 }
 
 function startLogAnimation() {
@@ -125,7 +210,8 @@ function showBlocked(reason, notes) {
   appendLog('[검사] 의미 필터가 입력을 거부함');
 }
 
-function showResult(payload) {
+function showResult(payload, options = {}) {
+  const { saveHistory = true } = options;
   blockedPanel.classList.add('hidden');
   resultGrid.classList.remove('hidden');
   analysisOutput.textContent = payload.analysis || '분석 결과가 없습니다.';
@@ -139,6 +225,10 @@ function showResult(payload) {
   regenButton.disabled = false;
   setStatus('완료');
   appendLog('[완료] 재구성 결과 생성됨');
+
+  if (saveHistory) {
+    rememberSuccessfulResult(lastFragment, payload);
+  }
 }
 
 async function analyze(fragment) {
@@ -213,3 +303,5 @@ copyButton.addEventListener('click', async () => {
     appendLog('[클립보드] 복사 실패');
   }
 });
+
+renderHistory();
